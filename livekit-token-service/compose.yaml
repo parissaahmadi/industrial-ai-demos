@@ -1,0 +1,37 @@
+# LiveKit media server + the token service. Secrets come from .env (copy .env.example), never from this file.
+services:
+  livekit:
+    image: livekit/livekit-server:v1.8
+    command: ["--config", "/etc/livekit.yaml"]
+    environment:
+      # "key: secret" pair the server accepts; the token service signs with the same pair
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY:?set LIVEKIT_API_KEY in .env}: ${LIVEKIT_API_SECRET:?set LIVEKIT_API_SECRET in .env}"
+    volumes:
+      - ./deploy/livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "7880:7880"        # signalling (WebSocket)
+      - "7881:7881"        # WebRTC over TCP
+      - "7882:7882/udp"    # WebRTC over UDP (single muxed port)
+    restart: unless-stopped
+
+  token-service:
+    build: .
+    environment:
+      LIVEKIT_API_KEY: "${LIVEKIT_API_KEY:?set LIVEKIT_API_KEY in .env}"
+      LIVEKIT_API_SECRET: "${LIVEKIT_API_SECRET:?set LIVEKIT_API_SECRET in .env}"
+      LIVEKIT_URL: "${LIVEKIT_URL:-ws://localhost:7880}"
+    volumes:
+      - token-data:/data
+    ports:
+      - "127.0.0.1:8000:8000"   # put TLS and a real reverse proxy in front before exposing it
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      - livekit
+    restart: unless-stopped
+
+volumes:
+  token-data:
