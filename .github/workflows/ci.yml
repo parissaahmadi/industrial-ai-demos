@@ -1,0 +1,34 @@
+name: ci
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        demo:
+          - workorder-approval-flow
+          - forward-only-migrator
+          - event-archive-api
+          - livekit-token-service
+          - vibration-anomaly-detection
+    defaults:
+      run:
+        working-directory: ${{ matrix.demo }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: sync
+        run: uv sync --frozen
+
+      - name: lint
+        run: uv run ruff check .
+
+      - name: test
+        run: uv run pytest -q
