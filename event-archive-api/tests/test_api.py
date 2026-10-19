@@ -1,6 +1,7 @@
 import json
 
 import pytest
+
 from event_archive.transcribe import MEDIA_TYPE, make_fakevox
 from helpers import GOOD_AUDIO, TOKENS, as_, make_app
 

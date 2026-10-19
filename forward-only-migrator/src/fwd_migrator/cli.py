@@ -8,7 +8,7 @@ import shutil
 import sqlite3
 import sys
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .errors import IntegrityProblem, MigrationError
@@ -74,7 +74,7 @@ def run_demo(out=None) -> int:
     with tempfile.TemporaryDirectory() as tmp:
         mdir, db = Path(tmp) / "migrations", str(Path(tmp) / "plant.sqlite3")
         shutil.copytree(example, mdir)
-        m = Migrator(db, mdir, actor="ops.a", clock=lambda: datetime(2026, 10, 12, 6, 0, tzinfo=timezone.utc))
+        m = Migrator(db, mdir, actor="ops.a", clock=lambda: datetime(2026, 10, 12, 6, 0, tzinfo=UTC))
 
         def show(title):
             print(f"\n$ {title}", file=out)

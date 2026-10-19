@@ -7,7 +7,7 @@ import sys
 
 from . import evaluate as ev
 from .csvio import read_features, write_features
-from .detectors import ALARM, OK, WARN, Baseline, Detector
+from .detectors import ALARM, Baseline, Detector
 from .machines import MACHINES
 from .signals import FAULTS
 

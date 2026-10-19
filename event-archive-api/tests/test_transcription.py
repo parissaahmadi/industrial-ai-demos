@@ -1,6 +1,7 @@
 import json
 
 import pytest
+
 from event_archive.errors import (
     Forbidden,
     Invalid,
@@ -20,7 +21,16 @@ from event_archive.transcribe import (
     check_container,
     make_fakevox,
 )
-from helpers import GOOD_AUDIO, add, add_audio, advance, audit_actions, audit_count, make_archive, work
+from helpers import (
+    GOOD_AUDIO,
+    add,
+    add_audio,
+    advance,
+    audit_actions,
+    audit_count,
+    make_archive,
+    work,
+)
 
 
 def rec(a, event):

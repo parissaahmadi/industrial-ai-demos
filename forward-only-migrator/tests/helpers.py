@@ -1,10 +1,10 @@
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fwd_migrator.runner import Migrator
 
-NOW = datetime(2026, 10, 12, 6, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 10, 12, 6, 0, tzinfo=UTC)
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples" / "migrations"
 
 BASE = {

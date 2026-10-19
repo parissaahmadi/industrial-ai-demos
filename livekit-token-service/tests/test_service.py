@@ -1,6 +1,7 @@
 import json
 
 import pytest
+
 from helpers import KEY, SECRET, START, Clock, actions, make_service, open_session
 from livekit_tokens import jwt
 from livekit_tokens.errors import (
@@ -90,9 +91,9 @@ def test_session_is_still_open_one_second_before_its_end():
 
 
 def test_rooms_are_unguessable_by_default():
+    from helpers import settings
     from livekit_tokens import db
     from livekit_tokens.service import Service
-    from helpers import settings
 
     svc = Service(db.connect(), settings(), Clock())
     svc.seed_users()

@@ -1,6 +1,7 @@
 import math
 
 import pytest
+
 from helpers import PUMP, sine
 from vibration_anomaly.features import FEATURES, HF_BAND, band_energy, extract
 from vibration_anomaly.machines import WINDOW

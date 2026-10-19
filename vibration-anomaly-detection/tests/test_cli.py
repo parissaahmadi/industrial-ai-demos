@@ -2,6 +2,7 @@ import io
 import sys
 
 import pytest
+
 from helpers import healthy_rows
 from vibration_anomaly import cli
 from vibration_anomaly import evaluate as ev

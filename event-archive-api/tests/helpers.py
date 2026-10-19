@@ -67,7 +67,6 @@ def ids(result):
 
 def make_app():
     from asgi import Client
-
     from event_archive.api import create_app
 
     arch = make_archive()

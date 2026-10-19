@@ -1,4 +1,5 @@
 import pytest
+
 from event_archive.textnorm import normalize, words
 
 

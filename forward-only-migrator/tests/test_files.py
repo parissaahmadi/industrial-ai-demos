@@ -1,6 +1,7 @@
 import hashlib
 
 import pytest
+
 from fwd_migrator.errors import InvalidMigrationFile
 from fwd_migrator.files import checksum_of, load_migrations
 from fwd_migrator.sqlsplit import split_statements

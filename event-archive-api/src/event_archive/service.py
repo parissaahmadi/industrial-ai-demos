@@ -44,7 +44,14 @@ from .errors import (
 from .models import CorrectRequest, IngestRequest, RedactRequest, fmt_timestamp, parse_timestamp
 from .query import COLUMNS, build_match
 from .textnorm import normalize
-from .transcribe import MAGIC, MEDIA_TYPE, MockTranscriber, PermanentError, Transcriber, TransientError
+from .transcribe import (
+    MAGIC,
+    MEDIA_TYPE,
+    MockTranscriber,
+    PermanentError,
+    Transcriber,
+    TransientError,
+)
 
 log = logging.getLogger("event_archive")
 

@@ -1,4 +1,5 @@
 import pytest
+
 from vibration_anomaly import evaluate as ev
 from vibration_anomaly.detectors import ALARM, OK, WARN, Status
 from vibration_anomaly.machines import MACHINES

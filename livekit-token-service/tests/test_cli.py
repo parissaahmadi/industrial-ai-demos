@@ -41,8 +41,8 @@ def test_init_db_prints_one_working_token_per_user(tmp_path, monkeypatch):
         assert cli.main(["init-db", "--db", path]) == 0
     lines = [ln.split() for ln in c.out.getvalue().splitlines()[1:]]
     assert [ln[0] for ln in lines] == [u for u, _, _ in SEED_USERS]
-    from livekit_tokens.service import Service
     from helpers import settings
+    from livekit_tokens.service import Service
 
     svc = Service(connect(path), settings(), time.time)
     assert svc.authenticate(lines[2][2]).role == "expert"

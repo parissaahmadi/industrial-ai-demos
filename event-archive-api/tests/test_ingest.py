@@ -1,9 +1,10 @@
 import json
+
 import pytest
-from event_archive.errors import Forbidden, Invalid, SourceRefConflict
-from event_archive.models import IngestRequest
-from helpers import add, advance, audit_actions, audit_count, ev, make_archive
 from pydantic import ValidationError
+
+from event_archive.errors import Forbidden, Invalid, SourceRefConflict
+from helpers import add, advance, audit_actions, audit_count, ev, make_archive
 
 
 def test_ingest_stores_event_and_audits_it():

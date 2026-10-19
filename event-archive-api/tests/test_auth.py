@@ -1,4 +1,5 @@
 import pytest
+
 from event_archive import db
 from event_archive.errors import NotFound, Unauthorized
 from helpers import TOKENS, audit_actions, make_archive

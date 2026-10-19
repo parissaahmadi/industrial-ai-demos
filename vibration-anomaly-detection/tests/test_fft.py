@@ -3,6 +3,7 @@ import math
 import random
 
 import pytest
+
 from vibration_anomaly.fft import dft, fft, hann, is_pow2
 
 

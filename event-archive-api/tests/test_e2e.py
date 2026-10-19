@@ -13,6 +13,7 @@ import urllib.request
 from pathlib import Path
 
 import pytest
+
 from event_archive import audit
 from event_archive.api import create_app
 from event_archive.db import connect

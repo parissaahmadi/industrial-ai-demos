@@ -19,7 +19,13 @@ from datetime import UTC, datetime
 from . import states as st
 from .db import hash_token
 from .errors import (
-    Forbidden, IdempotencyConflict, Invalid, InvalidTransition, NotFound, StaleVersion, Unauthorized,
+    Forbidden,
+    IdempotencyConflict,
+    Invalid,
+    InvalidTransition,
+    NotFound,
+    StaleVersion,
+    Unauthorized,
 )  # fmt: skip
 from .models import CreateRequest, Decision, EditRequest, VersionOnly, valid_idempotency_key
 

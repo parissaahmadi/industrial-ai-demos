@@ -4,6 +4,7 @@ import hmac
 import json
 
 import pytest
+
 from livekit_tokens import jwt
 
 # RFC 7515 appendix A.1: the published HS256 example, so the signer is checked against someone else's answer.

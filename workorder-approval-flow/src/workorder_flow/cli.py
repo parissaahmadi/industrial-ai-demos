@@ -6,14 +6,14 @@ import sys
 import threading
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .db import SEED_USERS, connect
 from .service import Flow
 
 
 def _flow(path: str) -> Flow:
-    return Flow(connect(path), clock=lambda: datetime.now(timezone.utc))
+    return Flow(connect(path), clock=lambda: datetime.now(UTC))
 
 
 def _issue_all(flow: Flow, out) -> dict[str, str]:
@@ -75,7 +75,7 @@ def run_demo(out=sys.stdout) -> int:
 
     from .api import create_app
 
-    flow = Flow(connect(":memory:"), clock=lambda: datetime.now(timezone.utc))
+    flow = Flow(connect(":memory:"), clock=lambda: datetime.now(UTC))
     tokens = {u: flow.issue_token(u) for u, _n, _r in SEED_USERS}
     srv = uvicorn.Server(uvicorn.Config(create_app(flow), host="127.0.0.1", port=0, log_level="error"))
     th = threading.Thread(target=srv.run, daemon=True)

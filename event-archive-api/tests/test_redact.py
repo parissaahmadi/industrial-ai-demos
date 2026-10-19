@@ -1,11 +1,12 @@
 import json
 
 import pytest
+from pydantic import ValidationError
+
 from event_archive.errors import Forbidden, NotFound, WrongState
 from event_archive.models import RedactRequest
 from event_archive.transcribe import MEDIA_TYPE
 from helpers import GOOD_AUDIO, add, add_audio, audit_actions, make_archive, work
-from pydantic import ValidationError
 
 R = RedactRequest(reason="entered on the wrong asset")
 

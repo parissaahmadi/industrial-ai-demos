@@ -3,6 +3,7 @@ import sqlite3
 import threading
 
 import pytest
+
 from fwd_migrator.errors import IntegrityProblem, MigrationError, MigrationFailed
 from fwd_migrator.runner import Migrator
 from helpers import BASE, EXAMPLES, NOW, make, query, tables

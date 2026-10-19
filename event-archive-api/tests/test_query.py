@@ -1,6 +1,7 @@
 import sqlite3
 
 import pytest
+
 from event_archive.errors import Invalid
 from event_archive.query import MAX_QUERY_CHARS, MAX_TERMS, build_match
 

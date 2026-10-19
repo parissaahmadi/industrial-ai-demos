@@ -1,6 +1,7 @@
 import math
 
 import pytest
+
 from helpers import healthy_rows, row
 from vibration_anomaly.detectors import (
     ALARM,

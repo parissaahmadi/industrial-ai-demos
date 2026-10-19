@@ -18,7 +18,7 @@ import sqlite3
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .errors import IntegrityProblem, MigrationError, MigrationFailed, PolicyViolation
@@ -125,7 +125,7 @@ class Migrator:
         busy_timeout: float = 30.0,
     ):
         self.db_path, self.directory, self.actor = str(db_path), Path(directory), actor
-        self.clock = clock or (lambda: datetime.now(timezone.utc))
+        self.clock = clock or (lambda: datetime.now(UTC))
         self.busy_timeout = busy_timeout
         self._before_lock: Callable[[], None] | None = None  # test seam, see _Tx
 
@@ -253,7 +253,7 @@ class Migrator:
                 f"{len(violations)} foreign-key violation(s) after the migration, first in table {first[0]!r}",
             )  # fmt: skip
         elapsed = int((time.perf_counter() - started) * 1000)
-        applied_at = self.clock().astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        applied_at = self.clock().astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
         conn.execute(
             f"INSERT INTO {BOOKKEEPING_TABLE} (version, name, checksum, applied_at, applied_by, duration_ms) "
             "VALUES (?, ?, ?, ?, ?, ?)",

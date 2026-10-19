@@ -1,6 +1,7 @@
 import sqlite3
 
 import pytest
+
 from event_archive import audit
 from event_archive.db import connect
 

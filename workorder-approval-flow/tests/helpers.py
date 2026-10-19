@@ -41,7 +41,6 @@ def submitted(flow, who="sub.a", cost=10_000_000):
 
 def make_app(limit=LIMIT):
     from asgi import Client
-
     from workorder_flow.api import create_app
 
     flow = make_flow(limit)

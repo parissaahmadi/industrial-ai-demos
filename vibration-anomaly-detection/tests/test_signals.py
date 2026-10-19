@@ -2,6 +2,7 @@ import math
 import random
 
 import pytest
+
 from helpers import PUMP
 from vibration_anomaly.features import extract
 from vibration_anomaly.machines import FS, MACHINES, WINDOW
