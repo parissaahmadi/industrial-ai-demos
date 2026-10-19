@@ -111,28 +111,57 @@ def cmd_demo(a) -> int:
     print(f"  t+{elapsed:>3}s  {json.dumps(arch.run_worker())}")
     for eid in (ids[12], ids[19]):
         r = arch.get(view, eid)["recording"]
-        print(f"  event #{eid}: status={r['status']} attempts={r['attempts']} error={r['last_error']}")
+        print(
+            f"  event #{eid}: status={r['status']} attempts={r['attempts']} error={r['last_error']}"
+        )
 
     _show("3. search: pump", _hits(arch.search(view, "pump", sort="relevance")))
-    _show("4. search with Persian digits and spelling: «PMP-۰۰۰۱ seal» and «خنک کننده»", _hits(arch.search(view, "PMP-۰۰۰۱ seal")))
+    _show(
+        "4. search with Persian digits and spelling: «PMP-۰۰۰۱ seal» and «خنک کننده»",
+        _hits(arch.search(view, "PMP-۰۰۰۱ seal")),
+    )
     print(_hits(arch.search(view, "خنک کننده")))
-    _show("5. search inside transcripts only: «روغن»", _hits(arch.search(view, "روغن", scope="transcript")))
-    _show("6. filters: critical alarms of the day, newest first", _hits(arch.search(view, kind="alarm", severity="critical")))
-    _show("7. hostile query is treated as plain words: «pump\" OR NEAR(a b) message:x*»", _hits(arch.search(view, 'pump" OR NEAR(a b) message:x*')))
+    _show(
+        "5. search inside transcripts only: «روغن»",
+        _hits(arch.search(view, "روغن", scope="transcript")),
+    )
+    _show(
+        "6. filters: critical alarms of the day, newest first",
+        _hits(arch.search(view, kind="alarm", severity="critical")),
+    )
+    _show(
+        '7. hostile query is treated as plain words: «pump" OR NEAR(a b) message:x*»',
+        _hits(arch.search(view, 'pump" OR NEAR(a b) message:x*')),
+    )
 
     t = arch.get_transcript(view, ids[9])
-    _show("8. low-confidence transcript flagged for review", {k: t[k] for k in ("status", "confidence", "needs_review", "text")})
-    arch.correct_transcript(op, ids[9], CorrectRequest(version=t["version"], text="نشت روغن از آب‌بند؛ سطح روغن خیلی پایین است"))
+    _show(
+        "8. low-confidence transcript flagged for review",
+        {k: t[k] for k in ("status", "confidence", "needs_review", "text")},
+    )
+    arch.correct_transcript(
+        op,
+        ids[9],
+        CorrectRequest(version=t["version"], text="نشت روغن از آب‌بند؛ سطح روغن خیلی پایین است"),
+    )
     t2 = arch.get_transcript(view, ids[9])
-    _show("9. after a human correction (machine text is kept)", {k: t2[k] for k in ("needs_review", "corrected", "text", "original_text")})
+    _show(
+        "9. after a human correction (machine text is kept)",
+        {k: t2[k] for k in ("needs_review", "corrected", "text", "original_text")},
+    )
     print(_hits(arch.search(view, "خیلی پایین", scope="transcript")))
 
     arch.redact(adm, ids[8], RedactRequest(reason="entered on the wrong asset"))
-    _show("10. after redacting event #%d" % ids[8], _hits(arch.search(view, "gearbox leak seal")))
+    _show(f"10. after redacting event #{ids[8]}", _hits(arch.search(view, "gearbox leak seal")))
 
     entries = arch.audit_entries(aud, limit=100)["items"]
-    _show("11. audit trail (last 6 of %d entries)" % len(entries),
-          "\n".join(f"  #{e['id']:<3} {e['actor']:14} {e['action']:20} {e['target']:10} {e['hash'][:12]}" for e in entries[-6:]))
+    _show(
+        f"11. audit trail (last 6 of {len(entries)} entries)",
+        "\n".join(
+            f"  #{e['id']:<3} {e['actor']:14} {e['action']:20} {e['target']:10} {e['hash'][:12]}"
+            for e in entries[-6:]
+        ),
+    )
     print("  " + json.dumps(arch.audit_verify(aud)))
 
     arch.db.execute("DROP TRIGGER audit_no_update")  # an attacker with raw database access
@@ -151,7 +180,9 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--db", default="archive.sqlite3")
     s.add_argument("--host", default="127.0.0.1")
     s.add_argument("--port", type=int, default=8000)
-    s.add_argument("--worker", action="store_true", help="also run the transcription worker in a thread")
+    s.add_argument(
+        "--worker", action="store_true", help="also run the transcription worker in a thread"
+    )
     s.add_argument("--interval", type=float, default=2.0)
     s.set_defaults(fn=cmd_serve)
     s = sub.add_parser("worker", help="run the transcription worker as its own process")
@@ -159,7 +190,9 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--once", action="store_true")
     s.add_argument("--interval", type=float, default=2.0)
     s.set_defaults(fn=cmd_worker)
-    s = sub.add_parser("verify-audit", help="check the audit hash chain of a database (exit 1 if broken)")
+    s = sub.add_parser(
+        "verify-audit", help="check the audit hash chain of a database (exit 1 if broken)"
+    )
     s.add_argument("--db", default="archive.sqlite3")
     s.add_argument("--expected-head", help="head hash you saved earlier; detects removed tail rows")
     s.set_defaults(fn=cmd_verify_audit)

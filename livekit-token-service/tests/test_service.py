@@ -98,7 +98,7 @@ def test_rooms_are_unguessable_by_default():
     svc = Service(db.connect(), settings(), Clock())
     svc.seed_users()
     rooms = set()
-    for i in range(5):
+    for _i in range(5):
         p = svc.authenticate(svc.issue_api_token("tech.a"))
         s = svc.create_session(p, "PMP-0001", "x")
         rooms.add(s["room"])
