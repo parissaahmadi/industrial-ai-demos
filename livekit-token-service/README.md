@@ -35,27 +35,104 @@ These come from LiveKit's own documentation and shape the design:
 
 ## Run it
 
+### Option A: local Python (no Docker)
+
 ```bash
 uv sync
 uv run livekit-tokens demo                                   # scripted, offline, fixed clock (output below)
+demo needs no secret and no database. For the HTTP API:
 
-cp .env.example .env                                         # then put a real secret in it:
-#   LIVEKIT_API_SECRET=$(openssl rand -hex 32)
+bash
+cp .env.example .env
+# put a real secret in it (at least 32 characters):
+openssl rand -hex 32
+# then edit .env: LIVEKIT_API_SECRET=<the hex string you just generated>
+
 set -a; . ./.env; set +a
 uv run livekit-tokens init-db --db tokens.sqlite3            # prints one API token per fictional user, once
 uv run livekit-tokens serve --db tokens.sqlite3              # API on 127.0.0.1:8000
-uv run livekit-tokens inspect-token <jwt> --verify           # decode a LiveKit token (and check its signature)
+inspect-token decodes a JWT and verifies its signature:
 
-docker compose up --build                                    # LiveKit + token service (see "not verified")
-docker compose run --rm token-service livekit-tokens init-db --db /data/tokens.sqlite3
-```
+bash
+uv run livekit-tokens inspect-token <jwt> --verify
+Option B: Docker (LiveKit + token service)
+See Try it with Docker below.
 
-## The scripted demo (real output)
+Try it with Docker (no Python needed)
+This is the fastest way to see the service in action. It starts LiveKit and the token service in two containers.
 
-`uv run livekit-tokens demo` (`python -m livekit_tokens demo`). Output of this repository's code, unedited (the
+The curl examples pipe through jq for readability. On Ubuntu:
+sudo apt install jq (or drop | jq to see raw JSON).
+
+1. Generate a secret and start the stack
+bash
+cp .env.example .env
+# put a real secret in it (at least 32 characters; never commit this file):
+openssl rand -hex 32
+# then edit .env: LIVEKIT_API_SECRET=<the hex string you just generated>
+
+docker compose up --build
+LiveKit listens on :7880 (HTTP) and :7881/:7882 (RTC). The token service listens on :8000.
+
+2. Create the fictional users
+In a second terminal (the first one is busy showing container logs):
+
+bash
+docker compose exec token-service livekit-tokens init-db --db /data/tokens.sqlite3
+You will see one API token per fictional user, printed once (only their SHA-256 hashes are stored):
+
+text
+tech.a   technician  2VKpPEBHoYe9o0IIaDlxoU-jNdNJOhrG9QwnJQp8yE4
+tech.b   technician  TuoAi1Yhee510xhgxC1C52UVB0r12BvpeJ-ScR4qOx8
+exp.c    expert      DObSfSuAqBsg-E28eTrshnwOjklOSHcTHMnFhaHbyeA
+sup.d    supervisor  1xgDAkVdTcSLAKeyc0aMvyPPitZyqjTgL1Cr2ef74uc
+adm.e    admin       BBdRT9_zIr4gx187exHiK-VZflaPgOOWZbRr8RosUWQ
+3. Walk through a session
+bash
+# Copy the technician token from step 2 into a shell variable.
+TECH_TOKEN="2VKpPEBHoYe9o0IIaDlxoU-jNdNJOhrG9QwnJQp8yE4"
+
+# The technician opens a session for a pump.
+curl -s -X POST http://127.0.0.1:8000/sessions \
+  -H "Authorization: Bearer $TECH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"asset_id":"PMP-0001","reason":"Bearing noise after restart"}' | jq
+# → {"id": 1, "room": "assist-…", "state": "open", ...}
+
+# The technician asks for a token to join the room.
+curl -s -X POST http://127.0.0.1:8000/sessions/1/token \
+  -H "Authorization: Bearer $TECH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"ttl_seconds":120}' | jq
+# → {"token": "eyJ…", "url": "ws://localhost:7880", "identity": "tech.a", "role": "technician", ...}
+
+# Verify the token signature and inspect its claims.
+JWT="eyJ…"  # paste the token from the previous step
+uv run livekit-tokens inspect-token "$JWT" --verify
+# → signature VERIFIED
+#   { "iss": "plantkey", "sub": "tech.a", ..., "video": { "roomJoin": true, "room": "assist-…", ... } }
+
+# A different technician cannot join this session.
+curl -i -X POST http://127.0.0.1:8000/sessions/1/token \
+  -H "Authorization: Bearer $OTHER_TECH_TOKEN"
+# → HTTP/1.1 403 Forbidden
+#   {"type":"forbidden","title":"forbidden","status":403,"detail":"this is another technician's session"}
+
+# The admin can read the audit trail (tokens appear only as SHA-256 fingerprints).
+curl -s http://127.0.0.1:8000/audit \
+  -H "Authorization: Bearer $ADMIN_TOKEN" | jq
+4. Clean up
+bash
+docker compose down
+If you also want to drop the audit database, add -v:
+
+bash
+docker compose down -v
+The scripted demo (real output)
+uv run livekit-tokens demo (python -m livekit_tokens demo). Output of this repository's code, unedited (the
 clock and room names are fixed, so it is the same every run):
 
-```text
+text
 
 
 == 1. a technician asks for remote help on a fictional pump
@@ -139,23 +216,24 @@ clock and room names are fixed, so it is the same every run):
   #16 exp.c   token.rate_limited session:1  {}
   #17 tech.a  session.close      session:1  {}
   #18 tech.a  token.refused      session:1  {"why": "closed"}
-```
-
 Reading it:
 
-* Step 2: one room, three different grants. The supervisor's token is `hidden` and cannot publish anything.
-* Step 3: the refusals are `403`/`409`/`422`, not silent failures; the TTL cap is enforced on the server.
-* Step 4: the signature and the clock are what make a token worth anything; the token is rejected under a wrong
-  secret and after its expiry.
-* Step 6: closing the session blocks **new** tokens only. The expert's earlier token is still valid for 480 s. This is
-  the LiveKit limitation above, shown on purpose.
-* Step 7: tokens appear only as fingerprints.
+Step 2: one room, three different grants. The supervisor's token is hidden and cannot publish anything.
 
-## Over HTTP (real session)
+Step 3: the refusals are 403/409/422, not silent failures; the TTL cap is enforced on the server.
 
-Real session against `serve` on this repository's code (API tokens and JWTs shortened; the clock is the real one):
+Step 4: the signature and the clock are what make a token worth anything; the token is rejected under a wrong
+secret and after its expiry.
 
-```text
+Step 6: closing the session blocks new tokens only. The expert's earlier token is still valid for 480 s. This is
+the LiveKit limitation above, shown on purpose.
+
+Step 7: tokens appear only as fingerprints.
+
+Over HTTP (real session)
+Real session against serve on this repository's code (API tokens and JWTs shortened; the clock is the real one):
+
+text
 $ curl -H "Authorization: Bearer $TECH" -H "Content-Type: application/json" localhost:8765/sessions \
        -d '{"asset_id":"PMP-0001","reason":"Bearing noise after restart"}'
 HTTP/1.1 201 Created
@@ -185,88 +263,94 @@ $ curl -H "Authorization: Bearer $ADMIN" localhost:8765/audit        (one line p
 1 tech.a session.create session:1 {"asset": "PMP-0001"}
 2 exp.c token.issue session:1 {"exp": 1792250021, "fingerprint": "de7f786241c6e0ca", "role": "expert"}
 3 tech.b access.denied session:1 {"attempted": "token.issue", "why": "this is another technician's session"}
-```
+nbf is 5 s before issue (clock allowance), so exp - nbf is 125 s for a 120 s token.
 
-`nbf` is 5 s before issue (clock allowance), so `exp - nbf` is 125 s for a 120 s token.
-
-On the client side, the app calls `POST /sessions/{id}/token`, then connects with the returned `url` and `token`
+On the client side, the app calls POST /sessions/{id}/token, then connects with the returned url and token
 using a LiveKit client SDK (not included here).
 
-## API
+API
+Method and path	Roles	Notes
+GET /health	none	
+GET /me	any token	
+POST /sessions	technician	{"asset_id", "reason"} → 201; 409 session_exists if one is already open
+GET /sessions	any token	technician: own (last 20); others: all open sessions
+GET /sessions/{id}	owner, expert, supervisor, admin	other technicians 403
+POST /sessions/{id}/token	owner, expert, supervisor, admin	optional {"ttl_seconds": 30..900}; 409 session_closed / session_expired; 429
+POST /sessions/{id}/close	owner, admin	idempotent
+GET /audit	admin	after_id, limit (1-200)
+Errors are RFC 9457-shaped: {"type", "title", "status", "detail"}. Every response is Cache-Control: no-store
+(responses carry credentials). Unexpected exceptions are logged server-side and answered with a generic 500.
 
-| Method and path | Roles | Notes |
-|---|---|---|
-| `GET /health` | none | |
-| `GET /me` | any token | |
-| `POST /sessions` | technician | `{"asset_id", "reason"}` → `201`; `409 session_exists` if one is already open |
-| `GET /sessions` | any token | technician: own (last 20); others: all open sessions |
-| `GET /sessions/{id}` | owner, expert, supervisor, admin | other technicians `403` |
-| `POST /sessions/{id}/token` | owner, expert, supervisor, admin | optional `{"ttl_seconds": 30..900}`; `409 session_closed` / `session_expired`; `429` |
-| `POST /sessions/{id}/close` | owner, admin | idempotent |
-| `GET /audit` | admin | `after_id`, `limit` (1-200) |
+Design decisions and limits (read before reusing)
+Not wired to LiveKit's server API. There is no RemoveParticipant, no room creation (by default LiveKit creates a room
+on first join), no webhooks. Closing a session here does not eject anyone who is already connected.
 
-Errors are RFC 9457-shaped: `{"type", "title", "status", "detail"}`. Every response is `Cache-Control: no-store`
-(responses carry credentials). Unexpected exceptions are logged server-side and answered with a generic `500`.
+No media, no recording. roomRecord is never granted. Whether recording is allowed for remote help is a
+policy decision this demo does not take.
 
-## Design decisions and limits (read before reusing)
+Identity = username. Joining twice with the same identity makes LiveKit drop the first connection; that is
+accepted here (one device per person per room; this is LiveKit's behaviour as I know it, not tested here).
 
-* **Not wired to LiveKit's server API.** There is no `RemoveParticipant`, no room creation (by default LiveKit creates a room
-  on first join), no webhooks. Closing a session here does not eject anyone who is already connected.
-* **No media, no recording.** `roomRecord` is never granted. Whether recording is allowed for remote help is a
-  policy decision this demo does not take.
-* **Identity = username.** Joining twice with the same identity makes LiveKit drop the first connection; that is
-  accepted here (one device per person per room; this is LiveKit's behaviour as I know it, not tested here).
-* **Rate limiting is in memory and per process.** It resets on restart and is not shared between replicas.
-* **One writer.** A single SQLite connection behind a lock; sessions are created inside `BEGIN IMMEDIATE`. It is a
-  deliberately small design, not a horizontally scaled one.
-* **Audit** is append-only against the application, not against someone with raw database access (no hash chain here;
-  the chained version is in `event-archive-api`). It records *that* a token was issued (role, expiry, fingerprint),
-  not the reason text or the token.
-* **API tokens** for the fictional users are random, stored as SHA-256, issued by the CLI only. There is no expiry,
-  rotation or login flow; in production this would sit behind your real identity provider.
-* **Clock.** JWT validity uses the service's clock; keep it NTP-synced. `nbf` is back-dated 5 s.
-* **The responsibility for the secret** is yours: it lives in `.env` (git-ignored), is passed to both containers, and
-  is never logged. Rotating it invalidates all outstanding tokens (that is fine: they are short).
-* Missing on purpose: TLS, per-IP rate limiting, token refresh endpoint (clients ask again), metrics.
+Rate limiting is in memory and per process. It resets on restart and is not shared between replicas.
 
-## Testing
+One writer. A single SQLite connection behind a lock; sessions are created inside BEGIN IMMEDIATE. It is a
+deliberately small design, not a horizontally scaled one.
 
-```bash
+Audit is append-only against the application, not against someone with raw database access (no hash chain here;
+the chained version is in event-archive-api). It records that a token was issued (role, expiry, fingerprint),
+not the reason text or the token.
+
+API tokens for the fictional users are random, stored as SHA-256, issued by the CLI only. There is no expiry,
+rotation or login flow; in production this would sit behind your real identity provider.
+
+Clock. JWT validity uses the service's clock; keep it NTP-synced. nbf is back-dated 5 s.
+
+The responsibility for the secret is yours: it lives in .env (git-ignored), is passed to both containers, and
+is never logged. Rotating it invalidates all outstanding tokens (that is fine: they are short).
+
+Missing on purpose: TLS, per-IP rate limiting, token refresh endpoint (clients ask again), metrics.
+
+Testing
+bash
 uv run pytest -q
 uv run ruff check
 python mutate10.py            # RUNNER="uv run pytest -q -x" python mutate10.py to pick the test command
-```
+213 tests: JWT (RFC 7515 vector, algorithm confusion, expiry/nbf boundaries, garbage input), grants
+(allow-list), settings, rate limiter boundaries, every rule of the service for every role, the HTTP layer, the CLI
+(including the deterministic demo), consistency of compose.yaml / livekit.yaml / Dockerfile / .env.example,
+and end-to-end tests over a real socket and a separate serve process.
 
-* **213 tests**: JWT (RFC 7515 vector, algorithm confusion, expiry/`nbf` boundaries, garbage input), grants
-  (allow-list), settings, rate limiter boundaries, every rule of the service for every role, the HTTP layer, the CLI
-  (including the deterministic demo), consistency of `compose.yaml` / `livekit.yaml` / `Dockerfile` / `.env.example`,
-  and end-to-end tests over a real socket and a separate `serve` process.
-* **Mutation check** (`mutate10.py`): 101 deliberate bugs applied one at a time to a copy of the code and the
-  deployment files (boundaries, removed checks, widened grants, longer lifetimes, token leaks into the audit trail,
-  a port or a user changed in the compose/Docker files...). **101/101 killed**. The first run stopped at mutant 74 (a typo in the script's pattern) after four survivors; each survivor pointed at a missing test (minimum secret length, inclusive bounds of numeric settings, rounding of `Retry-After`, `ttl_seconds=true`), and those tests were added.
-* Flakiness: the whole suite ran 8 times in a row and the real-socket file 10 times, without a failure.
+Mutation check (mutate10.py): 101 deliberate bugs applied one at a time to a copy of the code and the
+deployment files (boundaries, removed checks, widened grants, longer lifetimes, token leaks into the audit trail,
+a port or a user changed in the compose/Docker files...). 101/101 killed. The first run stopped at mutant 74 (a typo in the script's pattern) after four survivors; each survivor pointed at a missing test (minimum secret length, inclusive bounds of numeric settings, rounding of Retry-After, ttl_seconds=true), and those tests were added.
 
-### What was *not* verified
+Flakiness: the whole suite ran 8 times in a row and the real-socket file 10 times, without a failure.
 
-* **No LiveKit server was available.** The claim names (`video.roomJoin`, `room`, `canPublish`, `canSubscribe`,
-  `canPublishData`, `canPublishSources`, `hidden`, `metadata`, `attributes`) were checked against LiveKit's
-  authentication documentation, and the signature against the RFC 7515 vector, but **no token from this service was
-  presented to a real LiveKit server or SDK**. The `name` claim is what LiveKit's SDKs set; the docs page does not list it.
-* **`docker compose up` and `docker build` were not run** (no Docker daemon). The image tag
-  `livekit/livekit-server:v1.8` and the `LIVEKIT_KEYS` environment variable are written from memory of LiveKit's
-  documentation: check both. The compose/Docker files are covered only by the consistency tests above.
-* The test run used a small pytest stand-in because the build sandbox has no package index (`pytest`, `ruff`,
-  `httpx`, `fastapi` could not be installed). The tests are plain pytest style, but **`uv run pytest` and
-  `uv run ruff check` have not been run by the author**: run them once.
-* Only Python 3.13 was available with the dependencies. `requires-python = ">=3.11"` is declared but untested here
-  (CI runs 3.11 and 3.13).
-* `uv sync` was not run, so there is no `uv.lock`; commit the one your first sync creates.
-* Starlette is used instead of FastAPI (FastAPI was not installable here); the routes would port directly.
-* No load test.
+What was not verified
+No LiveKit server was available. The claim names (video.roomJoin, room, canPublish, canSubscribe,
+canPublishData, canPublishSources, hidden, metadata, attributes) were checked against LiveKit's
+authentication documentation, and the signature against the RFC 7515 vector, but no token from this service was
+presented to a real LiveKit server or SDK. The name claim is what LiveKit's SDKs set; the docs page does not list it.
 
-## Layout
+docker compose up and docker build were not run (no Docker daemon). The image tag
+livekit/livekit-server:v1.8 and the LIVEKIT_KEYS environment variable are written from memory of LiveKit's
+documentation: check both. The compose/Docker files are covered only by the consistency tests above.
 
-```text
+The test run used a small pytest stand-in because the build sandbox has no package index (pytest, ruff,
+httpx, fastapi could not be installed). The tests are plain pytest style, but uv run pytest and
+uv run ruff check have not been run by the author: run them once.
+
+Only Python 3.13 was available with the dependencies. requires-python = ">=3.11" is declared but untested here
+(CI runs 3.11 and 3.13).
+
+uv sync was not run, so there is no uv.lock; commit the one your first sync creates.
+
+Starlette is used instead of FastAPI (FastAPI was not installable here); the routes would port directly.
+
+No load test.
+
+Layout
+text
 src/livekit_tokens/
   jwt.py        HS256 sign / verify (standard library)
   grants.py     role -> LiveKit video grant (the allow-list)
@@ -281,6 +365,3 @@ src/livekit_tokens/
 compose.yaml  Dockerfile  .env.example  deploy/livekit.yaml
 tests/          213 tests (asgi.py = in-process ASGI client)
 mutate10.py     mutation check
-```
-
-License: MIT (put your name in `LICENSE`).
